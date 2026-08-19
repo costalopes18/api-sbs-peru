@@ -11,17 +11,21 @@ def home():
 
 @app.route('/sbs')
 def sbs_promedio():
-    fecha_str = request.args.get('data') # Exemplo: 10/08/2026
-    if not fecha_str:
-        return jsonify({'error': 'Data nao fornecida'}), 400
+    raw_data = request.args.get('data', '')
+    
+    # Extrai estritamente o padrão DD/MM/AAAA ignorando qualquer texto extra
+    match_data = re.search(r'(\d{2}/\d{2}/\d{4})', raw_data)
+    if not match_data:
+        return jsonify({'error': 'Data invalida. Use DD/MM/AAAA'}), 400
         
+    fecha_str = match_data.group(1) # Pega apenas '10/08/2026'
+    
     try:
         url = "https://www.sbs.gob.pe/app/pp/SISTIP_PORTAL/Paginas/Publicacion/TipoCambioPromedio.aspx"
         
         session = requests.Session()
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         
-        # 1. Acesso espião
         res = session.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(res.text, 'html.parser')
         
@@ -29,10 +33,9 @@ def sbs_promedio():
         viewstategenerator = soup.find('input', id='__VIEWSTATEGENERATOR')['value']
         eventvalidation = soup.find('input', id='__EVENTVALIDATION')['value']
         
-        # Formato iso
-        fecha_iso = f"{fecha_str[6:10]}-{fecha_str[3:5]}-{fecha_str[0:2]}"
+        partes = fecha_str.split('/')
+        fecha_iso = f"{partes[2]}-{partes[1]}-{partes[0]}"
         
-        # 2. Maleta de Dados
         data = {
             '__VIEWSTATE': viewstate,
             '__VIEWSTATEGENERATOR': viewstategenerator,
@@ -42,7 +45,6 @@ def sbs_promedio():
             'ctl00$cphContent$btnConsultar': 'Consultar'
         }
         
-        # 3. POST simulando humano
         res2 = session.post(url, data=data, headers=headers, timeout=10)
         
         html_limpo = re.sub(r'<[^>]+>', ' ', res2.text)
